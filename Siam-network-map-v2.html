@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Siam Network Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f3f6fa;color:#172033}
+button,input,select,textarea{font:inherit}button{cursor:pointer;border:0}
+header{position:sticky;top:0;z-index:1000;background:#0f172a;color:#fff;padding:10px 12px;display:flex;align-items:center;gap:9px}
+header h1{font-size:18px;margin:0;flex:1}.iconbtn{background:#1e293b;color:#fff;width:42px;height:42px;border-radius:10px;font-size:21px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:10px}.stat,.card{background:#fff;border-radius:13px;padding:12px;box-shadow:0 2px 10px #00000012}.stat b{display:block;font-size:21px}.stat span,.muted{font-size:12px;color:#64748b}
+.toolbar{display:flex;gap:8px;overflow:auto;padding:0 10px 10px}.btn{padding:11px 14px;border-radius:10px;background:#0f172a;color:#fff;white-space:nowrap}.green{background:#15803d}.red{background:#dc2626}.light{background:#e2e8f0;color:#172033}
+#map{height:55vh;min-height:390px;margin:0 10px 10px;border-radius:13px;overflow:hidden;box-shadow:0 2px 10px #00000012}
+.row{display:flex;gap:8px}.row>*{flex:1}input,select,textarea{width:100%;padding:11px;border:1px solid #cbd5e1;border-radius:9px;background:#fff}textarea{min-height:75px}
+label{display:block;font-size:13px;font-weight:600;margin:11px 0 5px}.panel{display:none;position:fixed;inset:0;z-index:2500;background:#fff;overflow:auto}.inner{max-width:620px;margin:auto;padding:18px}.close{float:right;background:#e2e8f0;padding:9px;border-radius:9px}
+.drawer{position:fixed;left:-290px;top:0;width:280px;height:100%;z-index:3000;background:#fff;padding:16px;box-shadow:5px 0 20px #0003;transition:.2s;overflow:auto}.drawer.open{left:0}.drawer button{width:100%;padding:12px;text-align:left;background:#f1f5f9;border-radius:9px;margin:4px 0}
+#login{min-height:100vh;display:flex;align-items:center;padding:18px;background:#0f172a}.loginbox{width:min(430px,100%);background:#fff;border-radius:18px;padding:22px;margin:auto}.hidden{display:none!important}
+.item{padding:10px 0;border-bottom:1px solid #e2e8f0}.badge{font-size:11px;background:#e2e8f0;border-radius:20px;padding:3px 7px}
+#status{padding:8px 12px;font-size:12px;color:#475569}.active{color:#15803d!important}.danger{color:#b91c1c!important}
+.staffrow{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid #e2e8f0}
+</style>
+</head>
+<body>
+
+<div id="login"><div class="loginbox">
+<h2>🗺️ Siam Network Map</h2><p class="muted">Staff Login</p>
+<label>Email</label><input id="email" type="email" placeholder="Email">
+<label>Password</label><input id="password" type="password" placeholder="Password">
+<div class="row" style="margin-top:12px"><button class="btn" onclick="login()">Login</button><button class="btn light" onclick="signup()">Sign up</button></div>
+<p id="loginMsg" class="muted" style="margin-top:12px"></p>
+</div></div>
+
+<div id="app" class="hidden">
+<header><button class="iconbtn" onclick="drawer()">☰</button><h1>Siam Network Map</h1><button class="iconbtn" onclick="locateMe()">⌖</button></header>
+<div id="status">Ready</div>
+<div class="stats">
+<div class="stat"><b id="total">0</b><span>Total Points</span></div><div class="stat"><b id="drop">0</b><span>Fiber Drop</span></div>
+<div class="stat"><b id="box">0</b><span>Fiber Box</span></div><div class="stat"><b id="olt">0</b><span>OLT</span></div>
+<div class="stat"><b id="problem">0</b><span>Problem</span></div><div class="stat"><b id="km">0.00</b><span>Fiber KM</span></div>
+</div>
+<div class="toolbar"><button class="btn green" onclick="openPoint()">＋ Add Point</button><button class="btn" onclick="startLine()">〰 Draw Fiber</button><button class="btn light" onclick="loadData()">↻ Refresh</button></div>
+<div id="map"></div>
+
+<div class="card">
+<div class="row"><input id="search" placeholder="🔎 Search point" oninput="renderList()"><select id="filter" onchange="renderList()"><option value="">All</option><option>Fiber Drop</option><option>Fiber Box</option><option>OLT</option><option>Problem</option></select></div>
+<div id="pointList"></div>
+</div>
+</div>
+
+<div id="drawer" class="drawer">
+<button onclick="drawer()">✕ Close</button>
+<h3>☰ Menu</h3>
+<button onclick="openPoint();drawer()">📍 Add Point</button>
+<button onclick="startLine();drawer()">〰 Draw Fiber Line</button>
+<button onclick="locateMe();drawer()">📌 My Location</button>
+<button onclick="loadData();drawer()">↻ Refresh</button>
+<hr>
+<div id="staffMenu"></div>
+<button onclick="logout()">🚪 Logout</button>
+</div>
+
+<div id="pointPanel" class="panel"><div class="inner">
+<button class="close" onclick="closePoint()">✕</button><h2>📍 Add Network Point</h2>
+<label>Point Type</label><select id="type"><option>Fiber Drop</option><option>Fiber Box</option><option>OLT</option><option>Problem</option></select>
+<label>Name / ID</label><input id="name" placeholder="যেমন FD-001">
+<label>Description</label><textarea id="desc" placeholder="অতিরিক্ত তথ্য"></textarea>
+<label>Latitude</label><input id="lat" readonly><label>Longitude</label><input id="lng" readonly>
+<div class="row" style="margin-top:10px"><button class="btn light" onclick="pickOnMap()">📌 Map-এ চাপুন</button><button class="btn light" onclick="useCurrent()">📍 Current Location</button></div>
+<button class="btn green" style="width:100%;margin-top:10px" onclick="savePoint()">💾 Save Point</button>
+</div></div>
+
+<div id="staffPanel" class="panel"><div class="inner">
+<button class="close" onclick="closeStaff()">✕</button><h2>👥 Staff Management</h2>
+<div class="stats" style="padding:0">
+<div class="stat"><b id="staffTotal">0</b><span>Total Staff</span></div>
+<div class="stat"><b id="staffActive">0</b><span>Active (15 min)</span></div>
+</div>
+<div id="staffList" style="margin-top:12px"></div>
+<p class="muted">Password দেখা যায় না। Staff password reset পরের secure Admin function দিয়ে করা হবে।</p>
+</div></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script type="module">
+import {createClient} from 'https://esm.sh/@supabase/supabase-js@2';
+const SUPABASE_URL='https://ebnujgpmilsyzzijlwcg.supabase.co';
+const SUPABASE_KEY='sb_publishable_xb7Lrhvt147dOmI17Qv2aw_b2c95cSF';
+const sb=createClient(SUPABASE_URL,SUPABASE_KEY);
+
+let map,userMarker,pickMarker,points=[],lines=[],picking=false,linePts=[],lineLayer=null,currentProfile=null;
+
+const $=id=>document.getElementById(id);
+const status=(t,ok=false)=>{$('status').textContent=t;$('status').className=ok?'active':''};
+
+async function init(){
+ const {data:{session}}=await sb.auth.getSession();
+ if(session) await showApp();
+ sb.auth.onAuthStateChange(async(e,s)=>{if(s)await showApp();else showLogin()});
+}
+async function showApp(){
+ $('login').classList.add('hidden');$('app').classList.remove('hidden');
+ setTimeout(async()=>{initMap();await loadProfile();await touch();await loadData();},80);
+}
+function showLogin(){$('app').classList.add('hidden');$('login').classList.remove('hidden')}
+window.login=async()=>{
+ $('loginMsg').textContent='Logging in...';
+ const r=await sb.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});
+ if(r.error){$('loginMsg').textContent=r.error.message;return}
+ await showApp();
+}
+window.signup=async()=>{
+ const e=$('email').value.trim(),p=$('password').value;
+ if(p.length<6){$('loginMsg').textContent='Password কমপক্ষে 6 অক্ষরের দিন';return}
+ const r=await sb.auth.signUp({email:e,password:p});
+ if(r.error){$('loginMsg').textContent=r.error.message;return}
+ if(r.data.user)await sb.from('staff_profiles').upsert({id:r.data.user.id,email:e,name:e,role:'staff',is_locked:false,last_active_at:new Date().toISOString()});
+ $('loginMsg').textContent='Account তৈরি হয়েছে। Email confirmation চাইলে email confirm করুন, তারপর Login করুন।';
+}
+window.logout=async()=>{await sb.auth.signOut();showLogin()};
+
+function initMap(){
+ if(map)return;
+ map=L.map('map').setView([23.8103,90.4125],13);
+ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20,attribution:'© OpenStreetMap'}).addTo(map);
+ map.on('click',e=>{if(picking)setPicked(e.latlng.lat,e.latlng.lng);else if(linePts.length)addLinePoint(e.latlng.lat,e.latlng.lng)});
+}
+window.locateMe=()=>useCurrent(true);
+window.useCurrent=async focus=>{
+ if(!navigator.geolocation){status('এই browser-এ Location নেই');return}
+ status('Location নেওয়া হচ্ছে...');
+ navigator.geolocation.getCurrentPosition(p=>{
+   const a=p.coords.latitude,b=p.coords.longitude;
+   if(focus||!map)returnLocation(a,b);
+   else setPicked(a,b);
+ },e=>status('Location permission দিন অথবা Map-এ নিজে location বাছাই করুন'));
+}
+function returnLocation(a,b){
+ map.setView([a,b],17);
+ if(userMarker)userMarker.remove();
+ userMarker=L.marker([a,b]).addTo(map).bindPopup('📍 আপনার বর্তমান অবস্থান').openPopup();
+ status('Current location পাওয়া গেছে',true);
+}
+function setPicked(a,b){
+ picking=false;$('pointPanel').style.display='block';
+ $('lat').value=a.toFixed(7);$('lng').value=b.toFixed(7);
+ if(pickMarker)pickMarker.remove();pickMarker=L.marker([a,b]).addTo(map);
+ map.setView([a,b],17);status('Location selected',true);
+}
+window.openPoint=()=>{$('pointPanel').style.display='block';picking=false;status('Point-এর location বাছাই করুন')};
+window.closePoint=()=>{$('pointPanel').style.display='none';picking=false};
+window.pickOnMap=()=>{$('pointPanel').style.display='none';picking=true;status('Map-এ যে জায়গায় Point দিতে চান সেখানে চাপুন')};
+
+window.savePoint=async()=>{
+ const a=parseFloat($('lat').value),b=parseFloat($('lng').value);
+ if(!Number.isFinite(a)||!Number.isFinite(b)){status('আগে Map-এ location বাছাই করুন');return}
+ const {data:{user}}=await sb.auth.getUser();
+ const r=await sb.from('network_points').insert({name:$('name').value.trim()||$('type').value,point_type:$('type').value,latitude:a,longitude:b,description:$('desc').value.trim(),created_by:user.id});
+ if(r.error){status('Save failed: '+r.error.message);return}
+ $('name').value='';$('desc').value='';$('lat').value='';$('lng').value='';closePoint();status('Point saved ✅',true);await loadData();
+};
+
+window.loadData=async()=>{
+ const p=await sb.from('network_points').select('*').order('created_at',{ascending:false});
+ if(p.error){status('Points load failed: '+p.error.message);return}
+ points=p.data||[];
+ const l=await sb.from('fiber_lines').select('*').order('created_at',{ascending:false});
+ if(l.error){status('Lines load failed: '+l.error.message);return}
+ lines=l.data||[];renderStats();renderList();drawMap();status('Data loaded ✅',true);
+}
+function renderStats(){
+ $('total').textContent=points.length;$('drop').textContent=points.filter(x=>x.point_type==='Fiber Drop').length;
+ $('box').textContent=points.filter(x=>x.point_type==='Fiber Box').length;$('olt').textContent=points.filter(x=>x.point_type==='OLT').length;
+ $('problem').textContent=points.filter(x=>x.point_type==='Problem').length;
+ $('km').textContent=(lines.reduce((a,x)=>a+(Number(x.length_m)||0),0)/1000).toFixed(2);
+}
+function drawMap(){
+ if(!map)return;
+ map.eachLayer(x=>{if(x instanceof L.Marker||x instanceof L.Polyline){if(x!==userMarker&&x!==pickMarker)map.removeLayer(x)}});
+ points.forEach(p=>L.marker([p.latitude,p.longitude]).addTo(map).bindPopup('<b>'+esc(p.name||'Point')+'</b><br>'+esc(p.point_type)+'<br>'+esc(p.description||'')));
+ lines.forEach(x=>{if(Array.isArray(x.path)&&x.path.length)L.polyline(x.path,{weight:4}).addTo(map)});
+}
+window.renderList=()=>{
+ const q=$('search').value.toLowerCase(),f=$('filter').value;
+ const a=points.filter(p=>(!f||p.point_type===f)&&((p.name||'')+' '+p.point_type+' '+(p.description||'')).toLowerCase().includes(q));
+ $('pointList').innerHTML=a.map(p=>'<div class="item"><b>'+esc(p.name||'Point')+'</b> <span class="badge">'+esc(p.point_type)+'</span><br><span class="muted">'+p.latitude.toFixed(6)+', '+p.longitude.toFixed(6)+'</span></div>').join('')||'<p class="muted">কোনো point নেই</p>';
+};
+
+window.startLine=()=>{linePts=[];if(lineLayer)lineLayer.remove();lineLayer=null;status('Map-এ একের পর এক ক্লিক করে Fiber Line আঁকুন')};
+function addLinePoint(a,b){linePts.push([a,b]);if(lineLayer)lineLayer.setLatLngs(linePts);else lineLayer=L.polyline(linePts,{weight:5,dashArray:'8 6'}).addTo(map);status('Fiber line points: '+linePts.length+' — Save করতে আবার Draw Fiber চাপবেন না; নিচের Save অপশন আসবে');showLineSave()}
+function showLineSave(){
+ if($('lineSave'))return;
+ const d=document.createElement('div');d.id='lineSave';d.className='card';d.innerHTML='<b>〰 Fiber Line</b><p class="muted">Point: <span id="lineCount">'+linePts.length+'</span></p><div class="row"><button class="btn green" onclick="saveLine()">💾 Save</button><button class="btn light" onclick="undoLine()">↩ Undo</button><button class="btn red" onclick="cancelLine()">Cancel</button></div>';
+ document.body.insertBefore(d,$('map'));
+}
+window.undoLine=()=>{linePts.pop();if(lineLayer)lineLayer.setLatLngs(linePts);if($('lineCount'))$('lineCount').textContent=linePts.length};
+window.cancelLine=()=>{if(lineLayer)lineLayer.remove();lineLayer=null;linePts=[];$('lineSave')?.remove();status('Line cancelled')};
+window.saveLine=async()=>{
+ if(linePts.length<2)return status('কমপক্ষে 2টি map point দিন');
+ let m=0;for(let i=1;i<linePts.length;i++)m+=map.distance(linePts[i-1],linePts[i]);
+ const {data:{user}}=await sb.auth.getUser();
+ const r=await sb.from('fiber_lines').insert({name:'Fiber Line',path:linePts,length_m:m,created_by:user.id});
+ if(r.error){status('Line save failed: '+r.error.message);return}
+ cancelLine();await loadData();status('Fiber line saved ✅',true);
+};
+
+async function loadProfile(){
+ const {data:{user}}=await sb.auth.getUser();if(!user)return;
+ let r=await sb.from('staff_profiles').select('*').eq('id',user.id).maybeSingle();
+ if(r.error||!r.data){await sb.from('staff_profiles').insert({id:user.id,email:user.email,name:user.email,role:'staff'});r=await sb.from('staff_profiles').select('*').eq('id',user.id).maybeSingle()}
+ currentProfile=r.data;
+ if(currentProfile?.is_locked){alert('এই Staff account locked।');await sb.auth.signOut();return}
+ if(currentProfile?.role==='admin'){ $('staffMenu').innerHTML='<button onclick="openStaff();drawer()">👥 Staff Management</button>';await loadStaff()}
+ else $('staffMenu').innerHTML='<p class="muted">Staff account</p>';
+}
+async function touch(){try{await sb.rpc('touch_staff_activity')}catch(e){}}
+setInterval(touch,60000);
+
+window.openStaff=async()=>{await loadStaff();$('staffPanel').style.display='block'};
+window.closeStaff=()=>$('staffPanel').style.display='none';
+async function loadStaff(){
+ if(currentProfile?.role!=='admin')return;
+ const r=await sb.rpc('admin_get_staff');
+ if(r.error){console.log(r.error);return}
+ const a=r.data||[];const now=Date.now();
+ $('staffTotal').textContent=a.length;$('staffActive').textContent=a.filter(x=>x.last_active_at&&now-Date.parse(x.last_active_at)<900000).length;
+ $('staffList').innerHTML=a.map(x=>'<div class="staffrow"><div><b>'+esc(x.email||x.name||'Staff')+'</b><br><span class="muted">'+(x.role||'staff')+' · '+(x.last_active_at?new Date(x.last_active_at).toLocaleString():'Not active')+'</span></div><button class="btn '+(x.is_locked?'green':'red')+'" onclick="toggleLock(\''+x.id+'\','+(!x.is_locked)+')">'+(x.is_locked?'Unlock':'Lock')+'</button></div>').join('')||'<p class="muted">No staff</p>';
+}
+window.toggleLock=async(id,locked)=>{const r=await sb.rpc('admin_set_staff_locked',{target_user_id:id,locked});if(r.error){alert(r.error.message);return}await loadStaff();alert(locked?'Staff locked':'Staff unlocked')};
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+init();
+</script>
+</body>
+</html>
