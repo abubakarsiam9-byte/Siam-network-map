@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Siam Network Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f3f6fa;color:#172033}
+button,input,select,textarea{font:inherit}button{cursor:pointer;border:0}
+header{position:sticky;top:0;z-index:1000;background:#0f172a;color:#fff;padding:10px 12px;display:flex;align-items:center;gap:9px}
+header h1{font-size:18px;margin:0;flex:1}.iconbtn{background:#1e293b;color:#fff;width:42px;height:42px;border-radius:10px;font-size:21px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:10px}.stat,.card{background:#fff;border-radius:13px;padding:12px;box-shadow:0 2px 10px #00000012}.stat b{display:block;font-size:21px}.stat span,.muted{font-size:12px;color:#64748b}
+.toolbar{display:flex;gap:8px;overflow:auto;padding:0 10px 10px}.btn{padding:11px 14px;border-radius:10px;background:#0f172a;color:#fff;white-space:nowrap}.green{background:#15803d}.red{background:#dc2626}.light{background:#e2e8f0;color:#172033}
+#map{height:55vh;min-height:390px;margin:0 10px 10px;border-radius:13px;overflow:hidden;box-shadow:0 2px 10px #00000012}
+.row{display:flex;gap:8px}.row>*{flex:1}input,select,textarea{width:100%;padding:11px;border:1px solid #cbd5e1;border-radius:9px;background:#fff}textarea{min-height:75px}
+label{display:block;font-size:13px;font-weight:600;margin:11px 0 5px}.panel{display:none;position:fixed;inset:0;z-index:2500;background:#fff;overflow:auto}.inner{max-width:620px;margin:auto;padding:18px}.close{float:right;background:#e2e8f0;padding:9px;border-radius:9px}
+.drawer{position:fixed;left:-290px;top:0;width:280px;height:100%;z-index:3000;background:#fff;padding:16px;box-shadow:5px 0 20px #0003;transition:.2s;overflow:auto}.drawer.open{left:0}.drawer button{width:100%;padding:12px;text-align:left;background:#f1f5f9;border-radius:9px;margin:4px 0}
+#login{min-height:100vh;display:flex;align-items:center;padding:18px;background:#0f172a}.loginbox{width:min(430px,100%);background:#fff;border-radius:18px;padding:22px;margin:auto}.hidden{display:none!important}
+.item{padding:10px 0;border-bottom:1px solid #e2e8f0}.badge{font-size:11px;background:#e2e8f0;border-radius:20px;padding:3px 7px}
+#status{padding:8px 12px;font-size:12px;color:#475569}.active{color:#15803d!important}.danger{color:#b91c1c!important}
+.staffrow{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid #e2e8f0}.menuBadge{float:right;background:#0f172a;color:#fff;border-radius:20px;padding:2px 8px;font-size:11px}.linebar{position:fixed;left:10px;right:10px;bottom:12px;z-index:2000;background:#fff;border-radius:14px;padding:10px;box-shadow:0 4px 18px #0004}.linebar .row{margin-top:8px}
+</style>
+</head>
+<body>
+
+<div id="login"><div class="loginbox">
+<h2>🗺️ Siam Network Map</h2><p class="muted">Staff / Admin Login</p>
+<label>Username / Staff ID</label><input id="username" type="text" placeholder="Staff ID / Username" autocomplete="username">
+<label>Password</label><input id="password" type="password" placeholder="Password">
+<div class="row" style="margin-top:12px"><button class="btn" onclick="login()">Login</button></div>
+<p id="loginMsg" class="muted" style="margin-top:12px"></p>
+</div></div>
+
+<div id="app" class="hidden">
+<header><button class="iconbtn" onclick="drawer()">☰</button><h1>Siam Network Map</h1><button id="topLocate" class="iconbtn" onclick="locateMe()">⌖</button></header>
+<div id="status">Ready</div>
+<div class="stats">
+<div class="stat"><b id="total">0</b><span>Total Points</span></div><div class="stat"><b id="drop">0</b><span>Fiber Drop</span></div>
+<div class="stat"><b id="box">0</b><span>Fiber Box</span></div><div class="stat"><b id="olt">0</b><span>OLT</span></div>
+<div class="stat"><b id="problem">0</b><span>Problem</span></div><div class="stat"><b id="km">0.00</b><span>Fiber KM</span></div>
+</div>
+<div class="toolbar"><button class="btn green" onclick="openPoint()">＋ Add Point</button><span id="adminToolbar"></span></div>
+<div id="map"></div>
+
+<div class="card">
+<div class="row"><input id="search" placeholder="🔎 Search point" oninput="renderList()"><select id="filter" onchange="renderList()"><option value="">All</option><option>Fiber Drop</option><option>Fiber Box</option><option>OLT</option><option>Problem</option></select></div>
+<div id="pointList"></div>
+</div>
+</div>
+
+<div id="drawer" class="drawer">
+<button onclick="drawer()">✕ Close</button>
+<h3>☰ Menu</h3>
+<button onclick="openPoint();drawer()">📍 Add Point</button>
+<div id="adminMenu"></div>
+<button onclick="openPointList();drawer()">📋 Point List</button>
+<button onclick="openLineList();drawer()">〰 Fiber Line List</button>
+<button onclick="openSettings();drawer()">⚙️ Settings</button>
+<hr>
+<div id="staffMenu"></div>
+<button onclick="logout()">🚪 Logout</button>
+</div>
+
+<div id="pointPanel" class="panel"><div class="inner">
+<button class="close" onclick="closePoint()">✕</button><h2>📍 Add Network Point</h2>
+<label>Point Type</label><select id="type"><option>Fiber Drop</option><option>Fiber Box</option><option>OLT</option><option>Problem</option></select>
+<label>Name / ID</label><input id="name" placeholder="যেমন FD-001">
+<label>Description</label><textarea id="desc" placeholder="অতিরিক্ত তথ্য"></textarea><label>Point Color</label><input id="color" type="color" value="#2563eb" style="height:48px;padding:4px">
+<label>Latitude</label><input id="lat" readonly><label>Longitude</label><input id="lng" readonly>
+<div class="row" style="margin-top:10px"><button class="btn light" onclick="pickOnMap()">📌 Map-এ চাপুন</button><button class="btn light" onclick="useCurrent()">📍 Current Location</button></div>
+<button class="btn green" style="width:100%;margin-top:10px" onclick="savePoint()">💾 Save Point</button>
+</div></div>
+
+<div id="staffPanel" class="panel"><div class="inner">
+<button class="close" onclick="closeStaff()">✕</button><h2>👷 Staff Panel</h2>
+<div class="card"><b>Logged in as:</b> <span id="staffEmail"></span><br><span class="muted">Role: <span id="staffRole"></span></span></div>
+<div class="stats" style="padding:10px 0">
+<div class="stat"><b id="staffPointCount">0</b><span>My Added Points</span></div>
+<div class="stat"><b id="staffLineCount">0</b><span>My Fiber Lines</span></div>
+<div class="stat"><b>✓</b><span>Full Map Access</span></div>
+</div>
+<p class="muted">Staff নিজের Point manage করতে পারবে। Admin সব Point/Line manage করতে পারবে।</p>
+</div></div>
+
+
+<div id="pointListPanel" class="panel"><div class="inner">
+<button class="close" onclick="closePointList()">✕</button>
+<h2>📋 Point List</h2>
+<div class="row"><input id="plistSearch" placeholder="🔎 Search" oninput="renderPointListPanel()"><select id="plistFilter" onchange="renderPointListPanel()"><option value="">All</option><option>Fiber Drop</option><option>Fiber Box</option><option>OLT</option><option>Problem</option></select></div>
+<div id="pointListPanelBody" style="margin-top:12px"></div>
+</div></div>
+
+<div id="lineListPanel" class="panel"><div class="inner">
+<button class="close" onclick="closeLineList()">✕</button>
+<h2>〰 Fiber Line List</h2>
+<div id="lineListPanelBody" style="margin-top:12px"></div>
+</div></div>
+
+<div id="editPointPanel" class="panel"><div class="inner">
+<button class="close" onclick="closeEditPoint()">✕</button><h2>✏️ Edit Point</h2>
+<input type="hidden" id="editPointId">
+<label>Point Type</label><select id="editType"><option>Fiber Drop</option><option>Fiber Box</option><option>OLT</option><option>Problem</option></select>
+<label>Name / ID</label><input id="editName">
+<label>Description</label><textarea id="editDesc"></textarea><label>Point Color</label><input id="editColor" type="color" value="#2563eb" style="height:48px;padding:4px">
+<label>Latitude</label><input id="editLat"><label>Longitude</label><input id="editLng">
+<div class="row" style="margin-top:10px"><button class="btn light" onclick="editPickOnMap()">📌 Map-এ চাপুন</button><button class="btn light" onclick="editUseCurrent()">📍 Current</button></div>
+<button class="btn green" style="width:100%;margin-top:10px" onclick="saveEditPoint()">💾 Save Changes</button>
+</div></div>
+
+<div id="editLinePanel" class="panel"><div class="inner">
+<button class="close" onclick="closeEditLine()">✕</button><h2>✏️ Edit Fiber Line</h2>
+<input type="hidden" id="editLineId">
+<label>Line Name</label><input id="editLineName" placeholder="Fiber Line">
+<label>Description</label><textarea id="editLineDesc" placeholder="Description"></textarea>
+<p class="muted">Line path: map-এ নতুন করে point দিয়ে path তৈরি করুন।</p>
+<div class="row"><button class="btn light" onclick="startEditLinePath()">📍 Edit Path</button><button class="btn green" onclick="saveEditLine()">💾 Save</button></div>
+</div></div>
+
+<div id="adminPanel" class="panel"><div class="inner">
+<button class="close" onclick="closeAdmin()">✕</button><h2>👑 Admin Panel — Staff Accounts</h2>
+<div class="stats" style="padding:0">
+<div class="stat"><b id="staffTotal">0</b><span>Total Staff</span></div>
+<div class="stat"><b id="staffActive">0</b><span>Active (15 min)</span></div><div class="stat"><b id="staffLocked">0</b><span>Locked</span></div>
+</div>
+<div class="card" style="margin-top:12px">
+<label>Staff Name</label><input id="newStaffName" type="text" placeholder="Staff-এর নাম">
+<label>Staff ID / Username</label><input id="newStaffUsername" type="text" placeholder="যেমন staff01">
+<label>Password</label><input id="newStaffPassword" type="password" placeholder="কমপক্ষে 6 অক্ষর">
+<button class="btn green" style="width:100%;margin-top:8px" onclick="createStaff()">➕ Create Staff</button>
+</div>
+<div id="staffList" style="margin-top:12px"></div>
+<p class="muted">Password কখনো দেখা যায় না। Admin Panel-এ Staff Lock/Unlock ও account management থাকবে।</p>
+</div></div>
+
+<div id="settingsPanel" class="panel"><div class="inner">
+<button class="close" onclick="closeSettings()">✕</button><h2>⚙️ Settings</h2>
+<div class="card"><b>Account</b><p class="muted">Username: <span id="settingsEmail">—</span></p><p class="muted">Role: <span id="settingsRole">—</span></p></div>
+<div class="card" style="margin-top:12px"><label>Change Password</label>
+<input id="oldPassword" type="password" placeholder="Current password">
+<input id="newPassword" type="password" placeholder="New password (minimum 6)">
+<button class="btn green" style="width:100%;margin-top:8px" onclick="changeMyPassword()">🔑 Change Password</button>
+<p id="settingsMsg" class="muted" style="margin-top:8px"></p></div>
+</div></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script type="module">
+import {createClient} from 'https://esm.sh/@supabase/supabase-js@2';
+const SUPABASE_URL='https://ebnujgpmilsyzzijlwcg.supabase.co';
+const SUPABASE_KEY='sb_publishable_xb7Lrhvt147dOmI17Qv2aw_b2c95cSF';
+const sb=createClient(SUPABASE_URL,SUPABASE_KEY);
+
+let map,userMarker,pickMarker,points=[],lines=[],picking=false,drawing=false,linePts=[],lineLayer=null,currentProfile=null;
+
+const $=id=>document.getElementById(id);
+const status=(t,ok=false)=>{$('status').textContent=t;$('status').className=ok?'active':''};
+const EDGE_URL=SUPABASE_URL+'/functions/v1';
+
+async function init(){
+ const {data:{session}}=await sb.auth.getSession();
+ if(session) await showApp();
+ sb.auth.onAuthStateChange(async(e,s)=>{if(s)await showApp();else showLogin()});
+}
+async function showApp(){
+ $('login').classList.add('hidden');$('app').classList.remove('hidden');
+ setTimeout(async()=>{initMap();await loadProfile();await touch();await loadData();},80);
+}
+function showLogin(){$('app').classList.add('hidden');$('login').classList.remove('hidden')}
+window.login=async()=>{
+ $('loginMsg').textContent='Logging in...';
+ const username=$('username').value.trim().toLowerCase(),password=$('password').value;
+ if(!username||!password){$('loginMsg').textContent='Username ও Password দিন।';return}
+ try{
+  const res=await fetch(EDGE_URL+'/staff-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})});
+  const data=await res.json();
+  if(!res.ok)throw new Error(data.error||'Login failed');
+  const s=await sb.auth.setSession({access_token:data.access_token,refresh_token:data.refresh_token});
+  if(s.error)throw s.error;
+  await showApp();
+ }catch(e){$('loginMsg').textContent=e.message||'Login failed';}
+}
+window.signup=async()=>{$('loginMsg').textContent='Staff account শুধু Admin তৈরি করবে। Public Sign up বন্ধ আছে।'};
+window.logout=async()=>{await sb.auth.signOut();showLogin()};
+
+function initMap(){
+ if(map)return;
+ map=L.map('map').setView([23.8103,90.4125],13);
+ const street=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20,attribution:'© OpenStreetMap'});
+ const satellite=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Tiles © Esri'});
+ const labels=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,opacity:.45,attribution:'© OpenStreetMap'});
+ street.addTo(map);
+ const baseMaps={'🗺️ Street':street,'🛰️ Satellite':satellite,'🌐 Hybrid':satellite};
+ L.control.layers(baseMaps,{}, {collapsed:true,position:'topright'}).addTo(map);
+ // Hybrid mode = satellite plus a light transparent street/label overlay when selected.
+ map.on('baselayerchange',e=>{ if(e.name==='🌐 Hybrid'){ if(!map.hasLayer(labels)) labels.addTo(map); } else if(map.hasLayer(labels)) labels.remove(); });
+ map.on('click',e=>{if(picking){setPicked(e.latlng.lat,e.latlng.lng);return}if(drawing){addLinePoint(e.latlng.lat,e.latlng.lng)}});
+}
+window.drawer=()=>{$('drawer').classList.toggle('open')};
+window.locateMe=()=>{if(currentProfile?.role!=='admin'){alert('শুধু Admin My Location ব্যবহার করতে পারবে।');return}useCurrent(true)};
+window.useCurrent=async focus=>{
+ if(!navigator.geolocation){status('এই browser-এ Location নেই');return}
+ status('Location নেওয়া হচ্ছে...');
+ navigator.geolocation.getCurrentPosition(p=>{
+   const a=p.coords.latitude,b=p.coords.longitude;
+   if(focus||!map)returnLocation(a,b);
+   else setPicked(a,b);
+ },e=>status('Location permission দিন অথবা Map-এ নিজে location বাছাই করুন'));
+}
+function returnLocation(a,b){
+ map.setView([a,b],17);
+ if(userMarker)userMarker.remove();
+ userMarker=L.marker([a,b]).addTo(map).bindPopup('📍 আপনার বর্তমান অবস্থান').openPopup();
+ status('Current location পাওয়া গেছে',true);
+}
+function setPicked(a,b){
+ picking=false;$('pointPanel').style.display='block';
+ $('lat').value=a.toFixed(7);$('lng').value=b.toFixed(7);
+ if(pickMarker)pickMarker.remove();pickMarker=L.marker([a,b]).addTo(map);
+ map.setView([a,b],17);status('Location selected',true);
+}
+window.openPoint=()=>{$('pointPanel').style.display='block';picking=false;drawing=false;status('Point-এর location বাছাই করুন')};
+window.closePoint=()=>{$('pointPanel').style.display='none';picking=false};
+window.pickOnMap=()=>{$('pointPanel').style.display='none';drawing=false;picking=true;status('Map-এ যে জায়গায় Point দিতে চান সেখানে চাপুন')};
+
+window.savePoint=async()=>{
+ const a=parseFloat($('lat').value),b=parseFloat($('lng').value);
+ if(!Number.isFinite(a)||!Number.isFinite(b)){status('আগে Map-এ location বাছাই করুন');return}
+ const {data:{user}}=await sb.auth.getUser();
+ const r=await sb.from('network_points').insert({name:$('name').value.trim()||$('type').value,point_type:$('type').value,latitude:a,longitude:b,description:$('desc').value.trim(),color:$('color').value||'#2563eb',created_by:user.id});
+ if(r.error){status('Save failed: '+r.error.message);return}
+ $('name').value='';$('desc').value='';$('color').value='#2563eb';$('lat').value='';$('lng').value='';closePoint();status('Point saved ✅',true);await loadData();
+};
+
+window.loadData=async()=>{
+ const p=await sb.from('network_points').select('*').order('created_at',{ascending:false});
+ if(p.error){status('Points load failed: '+p.error.message);return}
+ points=p.data||[];
+ const l=await sb.from('fiber_lines').select('*').order('created_at',{ascending:false});
+ if(l.error){status('Lines load failed: '+l.error.message);return}
+ lines=l.data||[];renderStats();renderList();drawMap();status('Data loaded ✅',true);
+}
+function renderStats(){
+ $('total').textContent=points.length;$('drop').textContent=points.filter(x=>x.point_type==='Fiber Drop').length;
+ $('box').textContent=points.filter(x=>x.point_type==='Fiber Box').length;$('olt').textContent=points.filter(x=>x.point_type==='OLT').length;
+ $('problem').textContent=points.filter(x=>x.point_type==='Problem').length;
+ $('km').textContent=(lines.reduce((a,x)=>a+(Number(x.length_m)||0),0)/1000).toFixed(2);
+}
+function drawMap(){
+ if(!map)return;
+ map.eachLayer(x=>{if(x instanceof L.Marker||x instanceof L.Polyline){if(x!==userMarker&&x!==pickMarker)map.removeLayer(x)}});
+ points.forEach(p=>L.marker([p.latitude,p.longitude]).addTo(map).bindPopup('<b>'+esc(p.name||'Point')+'</b><br>'+esc(p.point_type)+'<br>'+esc(p.description||'')));
+ lines.forEach(x=>{if(Array.isArray(x.path)&&x.path.length)L.polyline(x.path,{weight:4}).addTo(map)});
+}
+window.renderList=()=>{
+ const q=$('search').value.toLowerCase(),f=$('filter').value;
+ const a=points.filter(p=>(!f||p.point_type===f)&&((p.name||'')+' '+p.point_type+' '+(p.description||'')).toLowerCase().includes(q));
+ $('pointList').innerHTML=a.map(p=>'<div class="item"><b>'+esc(p.name||'Point')+'</b> <span class="badge">'+esc(p.point_type)+'</span><br><span class="muted">'+p.latitude.toFixed(6)+', '+p.longitude.toFixed(6)+'</span></div>').join('')||'<p class="muted">কোনো point নেই</p>';
+};
+
+window.startLine=()=>{if(currentProfile?.role!=='admin'){alert('শুধু Admin Fiber Line Draw করতে পারবে।');return}picking=false;drawing=true;linePts=[];if(lineLayer)lineLayer.remove();lineLayer=null;status('Fiber Draw চালু — Map-এ একের পর এক চাপুন');showLineSave()};
+function addLinePoint(a,b){if(!drawing)return;linePts.push([a,b]);if(lineLayer)lineLayer.setLatLngs(linePts);else lineLayer=L.polyline(linePts,{weight:5,dashArray:'8 6'}).addTo(map);updateLineUI();status('Point '+linePts.length+' যোগ হয়েছে — ভুল হলে ↩ Undo চাপুন')}
+function updateLineUI(){if($('lineCount'))$('lineCount').textContent=linePts.length;if($('undoBtn'))$('undoBtn').disabled=linePts.length===0;if($('saveLineBtn'))$('saveLineBtn').disabled=linePts.length<2}
+function showLineSave(){
+ if($('lineSave')){updateLineUI();return;}
+ const d=document.createElement('div');d.id='lineSave';d.className='linebar';d.innerHTML='<b>〰 Fiber Line Drawing</b><div class="muted">এখন পর্যন্ত <span id="lineCount">'+linePts.length+'</span>টি point • ভুল হলে শেষ point মুছে ফেলতে Undo</div><div class="row"><button id="saveLineBtn" class="btn green" onclick="saveLine()" disabled>💾 Save Line</button><button id="undoBtn" class="btn light" onclick="undoLine()" disabled>↩ Undo Last</button><button class="btn red" onclick="cancelLine()">✕ Cancel</button></div>';
+ document.body.appendChild(d);updateLineUI();
+}
+window.undoLine=()=>{if(!linePts.length){status('Undo করার মতো কোনো point নেই');return}linePts.pop();if(lineLayer)lineLayer.setLatLngs(linePts);updateLineUI();status(linePts.length?'শেষ point Undo হয়েছে':'সব point Undo হয়েছে')};
+window.cancelLine=()=>{drawing=false;if(lineLayer)lineLayer.remove();lineLayer=null;linePts=[];$('lineSave')?.remove();status('Fiber line cancelled')};
+window.saveLine=async()=>{
+ if(linePts.length<2)return status('কমপক্ষে 2টি map point দিন');
+ drawing=false;
+ let m=0;for(let i=1;i<linePts.length;i++)m+=map.distance(linePts[i-1],linePts[i]);
+ const {data:{user}}=await sb.auth.getUser();
+ const r=await sb.from('fiber_lines').insert({name:'Fiber Line',path:linePts,length_m:m,created_by:user.id});
+ if(r.error){status('Line save failed: '+r.error.message);return}
+ cancelLine();await loadData();status('Fiber line saved ✅',true);
+};
+
+async function loadProfile(){
+ const {data:{user}}=await sb.auth.getUser();if(!user)return;
+ let r=await sb.from('staff_profiles').select('*').eq('id',user.id).maybeSingle();
+ if(r.error||!r.data){alert('Staff profile পাওয়া যায়নি। Admin-এর সাথে যোগাযোগ করুন।');await sb.auth.signOut();return}
+ currentProfile=r.data;
+ if(currentProfile?.is_locked){alert('এই Staff account locked।');await sb.auth.signOut();return}
+ const isAdmin=currentProfile?.role==='admin';
+ $('staffMenu').innerHTML=isAdmin?'<button onclick="openStaff();drawer()">👷 Staff Panel</button><button onclick="openAdmin();drawer()">👑 Admin Panel <span id="menuStaffCount" class="menuBadge">0 Staff</span></button>':'<div class="muted" style="padding:10px 4px">👷 Staff Mode: শুধু Point Add করা যাবে</div>';
+ $('adminMenu').innerHTML=isAdmin?'<button onclick="startLine();drawer()">〰 Draw Fiber Line</button><button onclick="locateMe();drawer()">📌 My Location</button><button onclick="loadData();drawer()">↻ Refresh</button>':'';
+ $('adminToolbar').innerHTML=isAdmin?'<button class="btn" onclick="startLine()">〰 Draw Fiber</button><button class="btn light" onclick="loadData()">↻ Refresh</button>':'';
+ $('topLocate').style.display=isAdmin?'block':'none';
+ if(isAdmin) await loadStaff();
+}
+async function touch(){try{await sb.rpc('touch_staff_activity')}catch(e){}}
+setInterval(touch,60000);
+
+window.openStaff=()=>{ $('staffPanel').style.display='block'; $('staffEmail').textContent=currentProfile?.username||currentProfile?.name||'Staff'; $('staffRole').textContent=currentProfile?.role||'staff'; $('staffPointCount').textContent=points.filter(x=>x.created_by===currentProfile?.id).length; $('staffLineCount').textContent=lines.filter(x=>x.created_by===currentProfile?.id).length; };
+window.closeStaff=()=>$('staffPanel').style.display='none';
+window.openAdmin=async()=>{if(currentProfile?.role!=='admin'){alert('শুধু Admin Panel দেখা যাবে Admin account থেকে।');return} await loadStaff();$('adminPanel').style.display='block'};
+window.closeAdmin=()=>$('adminPanel').style.display='none';
+async function loadStaff(){
+ if(currentProfile?.role!=='admin') return;
+ let a=[];
+ if(currentProfile?.role==='admin'){
+   const r=await sb.rpc('admin_get_staff');
+   if(!r.error)a=r.data||[];
+ }else{
+   // Non-admin staff can view the user list; lock/unlock controls stay admin-only.
+   const r=await sb.from('staff_profiles').select('id,username,name,role,is_locked,last_active_at').order('username');
+   if(!r.error)a=r.data||[];
+ }
+ const now=Date.now();
+ $('staffTotal').textContent=a.length;
+ $('staffActive').textContent=a.filter(x=>x.last_active_at&&now-Date.parse(x.last_active_at)<900000).length;
+ $('staffLocked').textContent=a.filter(x=>x.is_locked).length;
+ if($('menuStaffCount'))$('menuStaffCount').textContent=a.length;
+ $('staffList').innerHTML=a.map(x=>{
+   const admin=currentProfile?.role==='admin';
+   const action=admin?'<button class="btn '+(x.is_locked?'green':'red')+'" onclick="toggleLock(\''+x.id+'\','+(!x.is_locked)+')">'+(x.is_locked?'Unlock':'Lock')+'</button>':'';
+   return '<div class="staffrow"><div><b>'+esc(x.username||x.name||'Staff')+'</b><br><span class="muted">'+esc(x.name||'')+' · '+(x.role||'staff')+' · '+(x.last_active_at?new Date(x.last_active_at).toLocaleString():'Not active')+(x.is_locked?' · 🔒 Locked':' · 🟢 Active')+'</span></div>'+action+'</div>';
+ }).join('')||'<p class="muted">No staff</p>';
+}
+window.toggleLock=async(id,locked)=>{
+ if(currentProfile?.role!=='admin'){alert('শুধু Admin Staff account Lock/Unlock করতে পারবে।');return}
+ const r=await sb.rpc('admin_set_staff_locked',{target_user_id:id,locked});
+ if(r.error){alert(r.error.message);return}
+ await loadStaff();alert(locked?'Staff locked':'Staff unlocked');
+};
+
+window.openPointList=()=>{renderPointListPanel();$('pointListPanel').style.display='block'};
+window.closePointList=()=>{$('pointListPanel').style.display='none'};
+window.openLineList=()=>{renderLineListPanel();$('lineListPanel').style.display='block'};
+window.closeLineList=()=>{$('lineListPanel').style.display='none'};
+
+function canEditPoint(p){return currentProfile?.role==='admin'||p.created_by===currentProfile?.id}
+function canDeletePoint(p){return canEditPoint(p)}
+function pointActions(p){
+ const a=canEditPoint(p)?`<button class="btn light" onclick="editPoint('${p.id}')">✏️ Edit</button>`:'';
+ const d=canDeletePoint(p)?`<button class="btn red" onclick="deletePoint('${p.id}')">🗑️ Delete</button>`:'';
+ return `<div class="row" style="margin-top:7px">${a}${d}</div>`;
+}
+function pointPopup(p){
+ return '<b>'+esc(p.name||'Point')+'</b><br>'+esc(p.point_type)+'<br>'+esc(p.description||'')+
+   '<br><span class="muted">'+Number(p.latitude).toFixed(6)+', '+Number(p.longitude).toFixed(6)+'</span>'+
+   pointActions(p);
+}
+window.editPoint=async id=>{
+ const p=points.find(x=>x.id===id); if(!p||!canEditPoint(p))return alert('এই Point edit করার অনুমতি নেই।');
+ $('editPointId').value=p.id;$('editType').value=p.point_type;$('editName').value=p.name||'';
+ $('editDesc').value=p.description||'';$('editColor').value=p.color||'#2563eb';$('editLat').value=p.latitude;$('editLng').value=p.longitude;
+ $('editPointPanel').style.display='block';
+};
+window.closeEditPoint=()=>{$('editPointPanel').style.display='none'};
+window.editPickOnMap=()=>{
+ $('editPointPanel').style.display='none'; picking=true; drawing=false; window._editingPoint=true;
+ status('Edit location: Map-এ নতুন জায়গায় চাপুন');
+};
+window.editUseCurrent=()=>{
+ if(!navigator.geolocation)return alert('Location নেই');
+ navigator.geolocation.getCurrentPosition(p=>{$('editLat').value=p.coords.latitude.toFixed(7);$('editLng').value=p.coords.longitude.toFixed(7);$('editPointPanel').style.display='block'});
+};
+const oldSetPicked=setPicked;
+setPicked=function(a,b){
+ if(window._editingPoint){
+   window._editingPoint=false;picking=false;$('editLat').value=a.toFixed(7);$('editLng').value=b.toFixed(7);
+   $('editPointPanel').style.display='block';status('New location selected',true);return;
+ }
+ oldSetPicked(a,b);
+};
+window.saveEditPoint=async()=>{
+ const id=$('editPointId').value;
+ const p=points.find(x=>x.id===id);if(!p||!canEditPoint(p))return alert('Permission denied');
+ const r=await sb.from('network_points').update({
+   name:$('editName').value.trim()||$('editType').value,point_type:$('editType').value,
+   description:$('editDesc').value.trim(),latitude:parseFloat($('editLat').value),longitude:parseFloat($('editLng').value)
+ }).eq('id',id);
+ if(r.error)return alert(r.error.message);
+ closeEditPoint();await loadData();renderPointListPanel();status('Point updated ✅',true);
+};
+window.deletePoint=async id=>{
+ const p=points.find(x=>x.id===id);if(!p||!canDeletePoint(p))return alert('Permission denied');
+ if(!confirm('এই Point delete করবেন?'))return;
+ const r=await sb.from('network_points').delete().eq('id',id);
+ if(r.error)return alert(r.error.message);
+ await loadData();renderPointListPanel();status('Point deleted ✅',true);
+};
+
+function renderPointListPanel(){
+ const q=($('plistSearch')?.value||'').toLowerCase(),f=$('plistFilter')?.value||'';
+ const a=points.filter(p=>(!f||p.point_type===f)&&((p.name||'')+' '+p.point_type+' '+(p.description||'')).toLowerCase().includes(q));
+ $('pointListPanelBody').innerHTML=a.map(p=>`<div class="item"><b>${esc(p.name||'Point')}</b> <span class="badge">${esc(p.point_type)}</span><br><span class="muted">${Number(p.latitude).toFixed(6)}, ${Number(p.longitude).toFixed(6)}</span>${pointActions(p)}</div>`).join('')||'<p class="muted">কোনো Point নেই</p>';
+}
+function lineActions(x){
+ const admin=currentProfile?.role==='admin';
+ return admin?`<div class="row" style="margin-top:7px"><button class="btn light" onclick="editLine('${x.id}')">✏️ Edit</button><button class="btn red" onclick="deleteLine('${x.id}')">🗑️ Delete</button></div>`:'';
+}
+function linePopup(x){
+ const km=(Number(x.length_m)||0)/1000;
+ return `<b>${esc(x.name||'Fiber Line')}</b><br>Distance: ${km.toFixed(3)} KM<br>${esc(x.description||'')}${lineActions(x)}`;
+}
+function renderLineListPanel(){
+ $('lineListPanelBody').innerHTML=lines.map(x=>`<div class="item"><b>${esc(x.name||'Fiber Line')}</b><br><span class="muted">${((Number(x.length_m)||0)/1000).toFixed(3)} KM</span>${lineActions(x)}</div>`).join('')||'<p class="muted">কোনো Fiber Line নেই</p>';
+}
+window.editLine=async id=>{
+ if(currentProfile?.role!=='admin')return alert('শুধু Admin Line edit করতে পারবে।');
+ const x=lines.find(v=>v.id===id);if(!x)return;
+ $('editLineId').value=x.id;$('editLineName').value=x.name||'Fiber Line';$('editLineDesc').value=x.description||'';
+ $('editLinePanel').style.display='block';
+};
+window.closeEditLine=()=>{$('editLinePanel').style.display='none'};
+window.startEditLinePath=()=>{
+ $('editLinePanel').style.display='none';drawing=true;linePts=[];
+ if(lineLayer)lineLayer.remove();lineLayer=null;
+ window._editingLine=$('editLineId').value;status('নতুন Line path-এর জন্য Map-এ চাপুন');
+ showLineSave();
+};
+const oldSaveLine=window.saveLine;
+window.saveEditLine=async()=>{
+ if(currentProfile?.role!=='admin')return alert('Admin only');
+ const id=$('editLineId').value;
+ const r=await sb.from('fiber_lines').update({name:$('editLineName').value.trim()||'Fiber Line',description:$('editLineDesc').value.trim()}).eq('id',id);
+ if(r.error)return alert(r.error.message);
+ closeEditLine();await loadData();renderLineListPanel();status('Line updated ✅',true);
+};
+window.deleteLine=async id=>{
+ if(currentProfile?.role!=='admin')return alert('Admin only');
+ if(!confirm('এই Fiber Line delete করবেন?'))return;
+ const r=await sb.from('fiber_lines').delete().eq('id',id);if(r.error)return alert(r.error.message);
+ await loadData();renderLineListPanel();status('Line deleted ✅',true);
+};
+
+const originalSaveLine=window.saveLine;
+window.saveLine=async()=>{
+ if(window._editingLine){
+   if(linePts.length<2)return status('কমপক্ষে 2টি point দিন');
+   const id=window._editingLine;let m=0;for(let i=1;i<linePts.length;i++)m+=map.distance(linePts[i-1],linePts[i]);
+   const r=await sb.from('fiber_lines').update({path:linePts,length_m:m}).eq('id',id);
+   if(r.error)return alert(r.error.message);
+   window._editingLine=null;cancelLine();await loadData();renderLineListPanel();status('Line path updated ✅',true);return;
+ }
+ return originalSaveLine();
+};
+
+const originalDrawMap=drawMap;
+drawMap=function(){
+ if(!map)return;
+ map.eachLayer(x=>{if(x instanceof L.Marker||x instanceof L.Polyline){if(x!==userMarker&&x!==pickMarker)map.removeLayer(x)}});
+ points.forEach(p=>{
+  const c=p.color||'#2563eb';
+  const icon=L.divIcon({
+    className:'',
+    html:`<div style="width:22px;height:22px;border-radius:50% 50% 50% 0;background:${esc(c)};border:3px solid #fff;box-shadow:0 2px 7px #0007;transform:rotate(-45deg)"></div>`,
+    iconSize:[22,22],iconAnchor:[11,22],popupAnchor:[0,-20]
+  });
+  L.marker([p.latitude,p.longitude],{icon}).addTo(map).bindPopup(pointPopup(p));
+});
+ lines.forEach(x=>{if(Array.isArray(x.path)&&x.path.length)L.polyline(x.path,{weight:4}).addTo(map).bindPopup(linePopup(x))});
+};
+
+window.createStaff=async()=>{
+  if(currentProfile?.role!=='admin')return alert('শুধু Admin Staff account তৈরি করতে পারবে।');
+  const name=$('newStaffName').value.trim();
+  const username=$('newStaffUsername').value.trim().toLowerCase();
+  const password=$('newStaffPassword').value;
+  if(!name)return alert('Staff-এর নাম দিন।');
+  if(!/^[a-z0-9._-]{3,64}$/.test(username))return alert('Username/Staff ID 3-64 অক্ষরের দিন (a-z, 0-9, ., _, -)।');
+  if(username.startsWith('.')||username.endsWith('.')||username.includes('..'))return alert('Username-এর dot ঠিকভাবে দিন।');
+  if(password.length<6)return alert('Password কমপক্ষে 6 অক্ষরের দিন।');
+  try{
+    const {data:{session}}=await sb.auth.getSession();
+    if(!session)throw new Error('Admin session পাওয়া যায়নি। আবার Login করুন।');
+    const res=await fetch(EDGE_URL+'/admin-create-staff',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:JSON.stringify({username,name,password})});
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.error||'Staff তৈরি হয়নি');
+    $('newStaffName').value='';$('newStaffUsername').value='';$('newStaffPassword').value='';await loadStaff();
+    alert('Staff account তৈরি হয়েছে ✅\nName: '+name+'\nUsername: '+username);
+  }catch(e){alert(e.message||'Staff তৈরি হয়নি');}
+};
+
+window.openSettings=()=>{
+  $('settingsEmail').textContent=currentProfile?.username||currentProfile?.name||'—';
+  $('settingsRole').textContent=currentProfile?.role||'staff';
+  $('settingsMsg').textContent='';$('settingsPanel').style.display='block';
+};
+window.closeSettings=()=>$('settingsPanel').style.display='none';
+window.changeMyPassword=async()=>{
+  const oldp=$('oldPassword').value,newp=$('newPassword').value;
+  if(newp.length<6)return $('settingsMsg').textContent='New password কমপক্ষে 6 অক্ষরের হতে হবে।';
+  const {data:{user}}=await sb.auth.getUser();if(!user)return;
+  if(oldp){const c=await sb.auth.signInWithPassword({email:user.email,password:oldp});if(c.error)return $('settingsMsg').textContent='Current password সঠিক নয়।';}
+  const r=await sb.auth.updateUser({password:newp});
+  $('settingsMsg').textContent=r.error?'Password change failed: '+r.error.message:'Password changed successfully ✅';
+  if(!r.error){$('oldPassword').value='';$('newPassword').value='';}
+};
+
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+init();
+</script>
+</body>
+</html>
